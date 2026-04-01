@@ -17,7 +17,11 @@ const UPDATE_INTERVAL: Duration = Duration::from_millis(500);
 // The kernel struct uses a flexible array member (data[]) which has size 0,
 // so the ioctl number must encode only the 5×u32 header size (20 bytes),
 // not our Rust struct's full size which includes the data buffer.
-nix::ioctl_readwrite_bad!(cros_ec_cmd, nix::request_code_readwrite!(0xEC, 0, 20), CrosEcCommandV2);
+nix::ioctl_readwrite_bad!(
+    cros_ec_cmd,
+    nix::request_code_readwrite!(0xEC, 0, 20),
+    CrosEcCommandV2
+);
 
 #[repr(C)]
 struct CrosEcCommandV2 {
@@ -64,15 +68,14 @@ fn set_fan_colors(dev: &File, colors: &[RgbS; NUM_LEDS]) -> io::Result<()> {
 
     // Safety: we're passing a properly initialized struct to the kernel ioctl
     unsafe {
-        cros_ec_cmd(dev.as_raw_fd(), &mut cmd)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        cros_ec_cmd(dev.as_raw_fd(), &mut cmd).map_err(io::Error::other)?;
     }
 
     if cmd.result != 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("EC returned error: {}", cmd.result),
-        ));
+        return Err(io::Error::other(format!(
+            "EC returned error: {}",
+            cmd.result
+        )));
     }
 
     Ok(())
@@ -194,9 +197,9 @@ fn run_loop(dry_run: bool) -> io::Result<()> {
             // If more cores than LEDs, show the hottest cores.
             // If fewer cores than LEDs, spread them out.
             let num_cores = usage.len();
-            for i in 0..NUM_LEDS {
+            for (i, color) in colors.iter_mut().enumerate() {
                 let core_idx = i * num_cores / NUM_LEDS;
-                colors[i] = load_to_color(usage[core_idx]);
+                *color = load_to_color(usage[core_idx]);
             }
         }
 
@@ -246,7 +249,14 @@ mod tests {
     #[test]
     fn test_load_to_color_mid() {
         let c = load_to_color(0.5);
-        assert_eq!(c, RgbS { r: 127, g: 0, b: 127 });
+        assert_eq!(
+            c,
+            RgbS {
+                r: 127,
+                g: 0,
+                b: 127
+            }
+        );
     }
 
     #[test]
