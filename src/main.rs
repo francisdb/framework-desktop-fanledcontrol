@@ -127,14 +127,12 @@ fn compute_usage(prev: &[(u64, u64)], curr: &[(u64, u64)]) -> Vec<f64> {
 }
 
 /// Map a load value (0.0 - 1.0) to a color: blue → purple → red.
-/// Uses a sqrt curve so low-to-mid differences are more visible.
 fn load_to_color(load: f64) -> RgbS {
     let load = load.clamp(0.0, 1.0);
-    let t = load.sqrt();
     RgbS {
-        r: (t * 255.0) as u8,
+        r: (load * 255.0) as u8,
         g: 0,
-        b: ((1.0 - t) * 255.0) as u8,
+        b: ((1.0 - load) * 255.0) as u8,
     }
 }
 
@@ -314,29 +312,14 @@ mod tests {
     }
 
     #[test]
-    fn test_load_to_color_low() {
-        // sqrt(0.2) ≈ 0.447 → r=114, b=140
-        let c = load_to_color(0.2);
+    fn test_load_to_color_mid() {
+        let c = load_to_color(0.5);
         assert_eq!(
             c,
             RgbS {
-                r: 114,
+                r: 127,
                 g: 0,
-                b: 140
-            }
-        );
-    }
-
-    #[test]
-    fn test_load_to_color_high() {
-        // sqrt(0.8) ≈ 0.894 → r=228, b=26
-        let c = load_to_color(0.8);
-        assert_eq!(
-            c,
-            RgbS {
-                r: 228,
-                g: 0,
-                b: 26
+                b: 127
             }
         );
     }
