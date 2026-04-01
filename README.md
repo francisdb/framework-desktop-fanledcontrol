@@ -2,9 +2,9 @@
 
 Controls the RGB LEDs on the Framework Desktop fan based on CPU load.
 
-- **Blue** = low load
-- **Purple** = medium load  
-- **Red** = high load
+- **Blue** = idle
+- **Purple** = moderate load
+- **Red** = full load
 
 Each LED represents a group of CPU cores, showing the maximum load within that group.
 

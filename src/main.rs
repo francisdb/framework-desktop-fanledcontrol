@@ -1,10 +1,10 @@
-use std::env;
+use clap::{Parser, Subcommand};
 use std::fs::{self, File, OpenOptions};
 use std::io;
 use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 static RUNNING: AtomicBool = AtomicBool::new(true);
 
@@ -126,13 +126,15 @@ fn compute_usage(prev: &[(u64, u64)], curr: &[(u64, u64)]) -> Vec<f64> {
         .collect()
 }
 
-/// Map a load value (0.0 - 1.0) to a color: blue → red.
+/// Map a load value (0.0 - 1.0) to a color: blue → purple → red.
+/// Uses a sqrt curve so low-to-mid differences are more visible.
 fn load_to_color(load: f64) -> RgbS {
     let load = load.clamp(0.0, 1.0);
+    let t = load.sqrt();
     RgbS {
-        r: (load * 255.0) as u8,
+        r: (t * 255.0) as u8,
         g: 0,
-        b: ((1.0 - load) * 255.0) as u8,
+        b: ((1.0 - t) * 255.0) as u8,
     }
 }
 
@@ -193,10 +195,7 @@ fn run_loop(dry_run: bool) -> io::Result<()> {
         for (i, color) in colors.iter_mut().enumerate() {
             let start = i * num_cores / NUM_LEDS;
             let end = (i + 1) * num_cores / NUM_LEDS;
-            let max_load = usage[start..end]
-                .iter()
-                .copied()
-                .fold(0.0_f64, f64::max);
+            let max_load = usage[start..end].iter().copied().fold(0.0_f64, f64::max);
             *color = load_to_color(max_load);
         }
 
@@ -222,9 +221,80 @@ fn run_loop(dry_run: bool) -> io::Result<()> {
     Ok(())
 }
 
+#[derive(Parser)]
+#[command(about = "Framework Desktop fan LED controller")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Show LED colors based on CPU load
+    Run {
+        /// Dry-run mode (no EC commands sent, shows colored blocks in terminal)
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Generate CPU load for testing
+    Load {
+        /// Target CPU load percentage (0-100)
+        #[arg(value_parser = clap::value_parser!(u8).range(0..=100))]
+        percent: u8,
+        /// Number of cores to load (defaults to all)
+        #[arg(long)]
+        cores: Option<usize>,
+    },
+}
+
+fn generate_load(percent: u8, cores: Option<usize>) {
+    let available = thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+    let num_cores = cores.unwrap_or(available).min(available);
+    println!("Generating {percent}% load on {num_cores}/{available} cores");
+    println!("Press Ctrl+C to stop");
+
+    ctrlc::set_handler(|| {
+        RUNNING.store(false, Ordering::Relaxed);
+    })
+    .expect("Failed to set Ctrl+C handler");
+
+    // Short cycle (10ms) so load averages out within each LED sample window
+    let busy = Duration::from_micros(u64::from(percent) * 100);
+    let idle = Duration::from_micros(u64::from(100 - percent) * 100);
+
+    let handles: Vec<_> = (0..num_cores)
+        .map(|_| {
+            thread::spawn(move || {
+                while RUNNING.load(Ordering::Relaxed) {
+                    let start = Instant::now();
+                    while start.elapsed() < busy && RUNNING.load(Ordering::Relaxed) {
+                        std::hint::spin_loop();
+                    }
+                    if !idle.is_zero() {
+                        thread::sleep(idle);
+                    }
+                }
+            })
+        })
+        .collect();
+
+    for h in handles {
+        h.join().ok();
+    }
+}
+
 fn main() -> io::Result<()> {
-    let dry_run = env::args().any(|a| a == "--dry-run");
-    run_loop(dry_run)
+    let cli = Cli::parse();
+    match cli.command {
+        None | Some(Command::Run { dry_run: false }) => run_loop(false),
+        Some(Command::Run { dry_run: true }) => run_loop(true),
+        Some(Command::Load { percent, cores }) => {
+            generate_load(percent, cores);
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -244,14 +314,29 @@ mod tests {
     }
 
     #[test]
-    fn test_load_to_color_mid() {
-        let c = load_to_color(0.5);
+    fn test_load_to_color_low() {
+        // sqrt(0.2) ≈ 0.447 → r=114, b=140
+        let c = load_to_color(0.2);
         assert_eq!(
             c,
             RgbS {
-                r: 127,
+                r: 114,
                 g: 0,
-                b: 127
+                b: 140
+            }
+        );
+    }
+
+    #[test]
+    fn test_load_to_color_high() {
+        // sqrt(0.8) ≈ 0.894 → r=228, b=26
+        let c = load_to_color(0.8);
+        assert_eq!(
+            c,
+            RgbS {
+                r: 228,
+                g: 0,
+                b: 26
             }
         );
     }
