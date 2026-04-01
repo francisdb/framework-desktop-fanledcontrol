@@ -6,7 +6,7 @@ Controls the RGB LEDs on the Framework Desktop fan based on CPU load.
 - **Purple** = medium load  
 - **Red** = high load
 
-When any CPU core hits 100%, the LEDs switch to a per-core view so you can see which cores are hot.
+Each LED represents a group of CPU cores, showing the maximum load within that group.
 
 ## Requirements
 

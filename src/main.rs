@@ -187,20 +187,17 @@ fn run_loop(dry_run: bool) -> io::Result<()> {
         // Overall average load
         let avg_load: f64 = usage.iter().sum::<f64>() / usage.len() as f64;
 
-        // Switch to per-core view when any core is pegged (>= 98%)
-        let any_core_maxed = usage.iter().any(|&u| u >= 0.98);
-
-        let mut colors = [load_to_color(avg_load); NUM_LEDS];
-
-        if any_core_maxed {
-            // Distribute per-core loads across LEDs for visual feedback.
-            // If more cores than LEDs, show the hottest cores.
-            // If fewer cores than LEDs, spread them out.
-            let num_cores = usage.len();
-            for (i, color) in colors.iter_mut().enumerate() {
-                let core_idx = i * num_cores / NUM_LEDS;
-                *color = load_to_color(usage[core_idx]);
-            }
+        // Group cores into LED buckets, show max load per bucket
+        let num_cores = usage.len();
+        let mut colors = [RgbS { r: 0, g: 0, b: 0 }; NUM_LEDS];
+        for (i, color) in colors.iter_mut().enumerate() {
+            let start = i * num_cores / NUM_LEDS;
+            let end = (i + 1) * num_cores / NUM_LEDS;
+            let max_load = usage[start..end]
+                .iter()
+                .copied()
+                .fold(0.0_f64, f64::max);
+            *color = load_to_color(max_load);
         }
 
         if dry_run {
