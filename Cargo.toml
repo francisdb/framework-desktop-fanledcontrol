@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-nix = { version = "0.30", features = ["ioctl"] }
+nix = { version = "0.31", features = ["ioctl"] }
 ctrlc = "3"
