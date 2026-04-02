@@ -10,7 +10,7 @@ use std::thread;
 use std::time::Duration;
 
 use cpu::{compute_usage, read_cpu_times};
-use ec::{load_to_color, print_color_bar, set_fan_colors, RgbS, CROS_EC_DEV, NUM_LEDS};
+use ec::{CROS_EC_DEV, NUM_LEDS, RgbS, load_to_color, print_color_bar, set_fan_colors};
 
 static RUNNING: AtomicBool = AtomicBool::new(true);
 

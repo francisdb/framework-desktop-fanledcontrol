@@ -14,6 +14,14 @@ Each LED represents a group of CPU cores, showing the maximum load within that g
 - Linux with `/dev/cros_ec` available (cros_ec kernel module)
 - Rust toolchain
 
+## Development
+
+Enable the shared git hooks (fmt/clippy checks on commit):
+
+```sh
+git config core.hooksPath .githooks
+```
+
 ## Build
 
 ```sh
