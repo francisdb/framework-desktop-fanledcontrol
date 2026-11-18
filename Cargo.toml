@@ -6,5 +6,5 @@ license = "MIT"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-nix = { version = "0.31", features = ["ioctl"] }
+nix = { version = "0.32", features = ["ioctl"] }
 ctrlc = "3"
